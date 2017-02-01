@@ -1,0 +1,1095 @@
+API End points
+==============
+
+## Authentication/Authorization
+
+Assuming using auth0, dashboard should have access to the user's JWT token, which will be passed on all server calls.
+All server calls will have http "AUTHORIZATION" header set to `Bearer <...JWT token...>`
+Server should grab that token, validate it using Auth0 app secret key, and perform authorization if user represented
+by the token has access to the requested resource.
+
+Server should reply with HTTP 403 Forbidden if user does not have access.
+
+## CORS
+
+All endpoints MUST support CORS headers, see https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS.
+
+All endpoints MUST respond to OPTIONS method with proper headers without trying to authenticate/authorise the user through token.
+
+White-listed domains: for now use request's Origin header value
+
+White-listed headers: Authorization
+
+Example of API response headers:
+```
+Access-Control-Allow-Origin: <value of the request's Origin header>
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+Access-Control-Allow-Headers: Authorization
+Access-Control-Allow-Credentials: true
+Access-Control-Max-Age: 3600
+Vary: Accept-Encoding, Origin
+```
+
+## Resource Types
+
+### Installation
+```
+{
+    "id": "23234",
+    "name": "Boiler Room",
+    "status": "alert | caution | good",
+    "alert_count": "2",
+    "image": "http://s3.aws.amazon.com/foobar.jpg",
+    "serial_number": "23432523545",
+    "mode": "sold-waiting | online | offline | decommissioned",
+    "connection_type": "eth | wifi | cell",
+    "property": <PropertySummary>,
+    "readings": <Readings>,
+    "timezone": "America/New_York"
+}
+```
+
+### InstallationSummary (NOTE: connection_type, property, reading not needed here)
+```
+{
+    "id": "23234",
+    "name": "Boiler Room",
+    "status": "alert | caution | good",
+    "alert_count": "2",
+    "image": "http://s3.aws.amazon.com/foobar.jpg",
+    "serial_number": "23432523545",
+    "mode": "sold-waiting | online | offline | decommissioned",
+}
+```
+
+### Property
+```
+{
+    "id": "123123",
+    "name": "455 Central Park West",
+    "street_address": "455 Central Park West",
+    "city": "New York",
+    "state": "NY",
+    "zip": "10025",
+    "alert_count": "2",
+    "timezone": "America/New_York",
+    "weather": {
+        "temperature_f": 74,
+        "humidity": 88,
+        "wx_icon_url": "http://icons-ak.wxug.com/i/c/k/partlycloudy.gif"
+    },
+    "installations": [
+        <InstallationSummary>,
+        ...
+    ]
+}
+```
+
+### PropertySummary
+```
+{
+    "id": "123123",
+    "name": "455 Central Park West",
+}
+```
+
+### Alert
+```
+{
+    "id": "42545"
+    "detection_time": "2015-03-28T14:23:00-05",
+    "type": "alert | caution | advisory",
+    "title_msg": "Flood Detected",
+    "property_name": "455 CPW",
+    "street_address": "455 Central Park West",
+    "installation_name": "Boiler Room",
+    "recipients": [ "JT", "BG", "KM", "LP", "JS"]
+},
+```
+
+### Readings
+
+Note: a sensor value of "null" means the sensor has failed and therefore the "status" field will be "error"
+
+```
+{
+    "reading_at": "2015-11-12T15:32:00",
+    "data": [
+        {"type": "temperature", "port": "onboard", "name": "Temperature", "value": 90, "status": "alert", "configured": true},
+        {"type": "temperature", "port": "external_1", "name": "New Temperature Sensor", "value": 70, "status": "good", "configured": false},
+        {"type": "temperature", "port": "external_2", "name": "Chiller line", "value": 70, "status": "caution", "configured": true},
+        {"type": "humidity", "port": "onboard", "name": "Humidity", "value": 25, "status": "good", "configured": true},
+        {"type": "lux", "port": "onboard", "name": "Light", "value": 105, "status": "good", "configured": true},
+        {"type": "motion", "port": "onboard", "name": "Motion", "value": "2015-11-23 14:23:00", "status": "good", "configured": true},
+        {"type": "noise", "port": "onboard", "name": "Noise", "value": "2015-11-23 14:23:00", "status": "caution", "configured": true},
+        {"type": "co", "port": "onboard", "name": "CO", "value": 350, "status": "good", "configured": true},
+        {"type": "airq", "port": "onboard", "name": "Air", "value": 450, "status": "good", "configured": true},
+        {"type": "flood", "port": "external_3", "name": "Floor", "value": true, "status": "error, "configured": true"}
+    ]
+}
+```
+
+_______________________________________________________________________________________________________
+
+## Endpoints
+
+### Property list with installation summaries
+
+Description:    Return JSON list of all properties with alert count and JunctionBox details to be displayed on the dashboard overview
+
+Method:         GET
+
+Request:        http://cloud.junction.com/api/v1/properties
+
+Response:
+
+```
+{
+    "status": true | false,
+    "properties": [<Property>, ...]
+}
+```
+
+_______________________________________________________________________________________________________
+
+### Alerts list
+
+Description:	Return JSON list of un-acknowledged alerts for an installation
+
+Method:			GET
+
+Request:		http://cloud.junction.com/api/v1/alerts/installation/{installationId}/unacknowledged
+
+Query:          installation_id
+
+Example:        http://cloud.junction.com/api/v1/alerts/property/{installationId}/unacknowledged
+
+Response:
+```
+{
+    "status": true | false,
+    "alerts":	[<Alert>, ...]
+}
+```
+________________________________________________________________________________________________________
+
+### Alert History
+
+Description:    Return JSON list of Alert History for an installation
+
+Method:         GET
+
+Request:        http://cloud.junction.com/api/v1/installations/{installationId}/alerts
+
+Response:
+```
+{
+    "status": true | false
+    "alerts": [ <Alert>, ... ]
+
+}
+```
+____________________________________________________________________________________________________
+### Acknowledge an alert
+
+Description:  Mark alert as acknowledged
+
+Method: POST
+
+Request:  http://cloud.junction.com/api/v1/alerts/<alert_id>/acknowledge
+
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+________________________________________________________________________________________________________
+### Videos
+
+Description:    Return JSON list of Videos per installation
+
+Method:         GET
+
+Request:        http://cloud.junction.com/api/v1/installations/:installation_id/videos
+
+Response:       Return all videos for the specified installation
+```
+{
+    "status": true | false
+    "videos": [ { "video_date":"2015-03-28T14:23:00-05", "video_url":"http://...."}, ... ]
+}
+```
+_______________________________________________________________________________________________________
+
+### Installation settings
+
+Description:    Return JSON list of JunctionBox settings
+
+Method:         GET
+
+Request:        http://cloud.junction.com/api/v1/installations/:installation_id/settings
+
+Response:
+```
+{
+    "status": true | false
+    #TODO
+}
+```
+________________________________________________________________________________________________________
+
+### Property detailed information
+
+Description:	Return JSON list with property information for a given property_id
+
+Method:			GET
+
+Request:		http://cloud.junction.com/api/v1/properties/:property_id
+
+Response:
+```
+{
+    "status": true | false,
+    "property": <Property>
+}
+```
+________________________________________________________________________________________________________
+
+### Update property information for individual property settings
+
+Description:	Update property values for a given property_id
+
+Method: 		POST
+
+Request:		http://cloud.junction.com/api/v1/properties/:property_id
+
+Payload:
+```
+{
+    <Property>
+}
+```
+Accepted keys:
+"name"
+"street_address"
+"city"
+"state"
+"zip"
+
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+_________________________________________________________________________________________________
+
+### Installation Readings
+
+Description:	Return JSON list of information to render a junctionbox card.  Optional reading_at parameter to specify data from a specific time.
+
+Method:			GET
+
+Request:		http://cloud.junction.com/api/v1/installations/:installation_id/readings[?reading_at=datestamp]
+
+Response:
+```
+{
+    "status": true | false,
+    "readings": <Readings>
+}
+```
+#TODO
+Issues: ( in <Readings> )
+1. Undefined external_1, external_2, external_3
+2. Undefined lux
+3. Undefined noise
+4. Undefined status fields for response
+_________________________________________________________________________________________________
+
+### Property Contacts
+
+Description:	Return list of all contacts associated with a property_id
+
+Method:			GET
+
+Request:		http://cloud.junction.com/api/v1/properties/:property_id/contacts
+
+Response:
+```
+{
+"status": true | false,
+"contacts": [
+            {
+                "contact_id": "234324",
+                "name": "John Doe",
+                "cellphone": "(917) 561-5136",
+                "email": "john@doe.com",
+                "initials": "JD",
+                "escalation_level": "Building Manager",
+                "escalation_level_id": "8",
+                "company":"compnay name",
+                "address":"1 park place",
+                "city":"New York",
+                "state":"NY",
+                "zip":"10023"
+            },
+            ....
+        ]
+}
+```
+_____________________________________________________________________________________
+
+### Add Property Contacts
+
+Description:	Add a contact associated with a property-id
+
+Method:			POST
+
+Request:		http://cloud.junction.com/api/v1/properties/:property_id/contacts
+
+Payload:
+```
+{
+    "name": "John Doe",
+    "cellphone": "(917) 561-5136",
+    "email": "john@doe.com",
+    "escalation_level_id": "8",
+    "company":"compnay name",
+    "address":"1 park place",
+    "city":"New York",
+    "state":"NY",
+    "zip":"10023",
+    "update": false
+}
+```
+
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+#TODO
+Issue:
+1. if email not present in database then it will gives false status with message 'Email not exist.'
+_________________________________________________________________________________________________
+
+### Update Property Contacts
+
+Description:	Update an existing contact associated with a property-id
+
+Method:			POST
+
+Request:		http://cloud.junction.com/api/v1/properties/:property_id/contacts/:contact_id
+
+Payload:
+```
+{
+    "name": "John Doe",
+    "cellphone": "(917) 561-5136",
+    "email": "john@doe.com",
+    "escalation_level_id": "8",
+    "company":"compnay name",
+    "address":"1 park place",
+    "city":"New York",
+    "state":"NY",
+    "zip":"10023",
+    "update": true
+}
+```
+
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+
+_________________________________________________________________________________________________
+
+### Delete a Property Contact
+
+Description:	Delete an existing contact associated with a property-id
+
+Method:			POST
+
+Request:		http://cloud.junction.com/api/v1/properties/:property_id/contacts/:contact_id
+
+Payload:
+```
+{
+    "delete": true | false
+}
+```
+
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+
+_________________________________________________________________________________________________
+
+### Escalation Levels - return current values
+
+Description:	Return current escalation values for a property-id
+
+Method:			GET
+
+Request:		http://cloud.junction.com/api/v1/properties/:property_id/escalation
+
+Response:
+```
+{
+  "status": true,
+  priority: {
+              "high": {
+                frequency":15, "escalation_level_1":0, "escalation_level_2":30,  "escalation_level_3":60, "escalation_level_4":90,"escalation_level_5":90
+                },
+              "normal": {
+                "frequency":15, "escalation_level_1":0, "escalation_level_2":30,  "escalation_level_3":60,             "escalation_level_4":90, "escalation_level_5":90
+                },
+              "low":{
+                "frequency":15, "escalation_level_1":0, "escalation_level_2":30,  "escalation_level_3":60,             "escalation_level_4":90, "escalation_level_5":90
+                },
+              "none":{
+                "frequency":15, "escalation_level_1":0, "escalation_level_2":30,  "escalation_level_3":60,            "escalation_level_4":90, "escalation_level_5":90
+              }
+            }
+}
+```
+_________________________________________________________________________________________________
+
+### Escalation Levels - update current values
+
+Description:	Update current escalation values for a property-id
+
+Method:			POST
+
+Request:		http://cloud.junction.com/api/v1/properties/:property_id/escalation
+
+Payload (Accepted keys):
+```
+{
+  priority: {
+              "high": {
+                frequency":15, "escalation_level_1":0, "escalation_level_2":30,  "escalation_level_3":60, "escalation_level_4":90,"escalation_level_5":90
+                },
+              "normal": {
+                "frequency":15, "escalation_level_1":0, "escalation_level_2":30,  "escalation_level_3":60,             "escalation_level_4":90, "escalation_level_5":90
+                },
+              "low":{
+                "frequency":15, "escalation_level_1":0, "escalation_level_2":30,  "escalation_level_3":60,             "escalation_level_4":90, "escalation_level_5":90
+                },
+              "none":{
+                "frequency":15, "escalation_level_1":0, "escalation_level_2":30,  "escalation_level_3":60,            "escalation_level_4":90, "escalation_level_5":90
+              }
+            }
+}
+```
+
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+_________________________________________________________________________________________________
+
+
+### Priority Levels - set current values
+
+Description: Set priority values for a property-id
+
+Method:			POST
+
+Request:		http://cloud.junction.com/api/v1/properties/:property_id/priority
+
+Payload:
+```
+{
+"priority":
+{ "high": [ "flood", "carbon_monoxide", "high_temperature", "high_alert_acknowledged" ], "normal": [ "low_temperature", "low_humidity", "noise_category", "internet_offline", "power_out_category", "air_quality", "junctionbox_error_category", "high_ext_temp", "low_ext_temp", "flood_sensor_connected", "external_temp_sensor_connected", "high_humidity", "unit_back_online", "over_heating", "unit_hardware_changed", "sound_loud", "sound_quiet", "junctionbox_offline", "internal_new_unit_first_check_in", "external_new_unit_first_check_in", "unit_hardware_hacked", "unknown_unit_checked_in", "too_many_external_sensors" ], "low": [ "motion", "weather_alert", "auto_acknowledged", "lights_off", "lights_on" ] }
+}
+```
+
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+_________________________________________________________________________________________________
+
+### Priority Levels - retrieve current values
+
+Description:	Retrieve current priority levels for a property-id
+
+Method:			GET
+
+Request:		http://cloud.junction.com/api/v1/properties/:property_id/priority
+
+Response:
+```
+{
+  "status": true | false
+"priority":
+{ "high": [ "flood", "carbon_monoxide", "high_temperature", "high_alert_acknowledged" ], "normal": [ "low_temperature", "low_humidity", "noise_category", "internet_offline", "power_out_category", "air_quality", "junctionbox_error_category", "high_ext_temp", "low_ext_temp", "flood_sensor_connected", "external_temp_sensor_connected", "high_humidity", "unit_back_online", "over_heating", "unit_hardware_changed", "sound_loud", "sound_quiet", "junctionbox_offline", "internal_new_unit_first_check_in", "external_new_unit_first_check_in", "unit_hardware_hacked", "unknown_unit_checked_in", "too_many_external_sensors" ], "low": [ "motion", "weather_alert", "auto_acknowledged", "lights_off", "lights_on" ] }
+}
+```
+_________________________________________________________________________________________________
+
+
+### Graph Data
+
+Description:	Return JSON to be plugged into charting tool
+
+Method:			GET
+
+Request:		http://cloud.junction.com/api/v1/graph/:installation_id/:graph_type
+
+Notes:          :graph_type is as follows:
+                    1 = Temperature and Humidity
+                    2 = Motion and Light Levels
+                    3 = Sound Levels
+                    4 = Air Quality
+                    5 =  Mold Risk
+
+Response:
+```
+    {
+        "status": true | false,
+        "chart": {'zoomType': 'xy'},
+        "xAxis": [{ 'type': 'datetime', 'crosshair': true }],
+        "yAxis": [{ 'labels': { 'format': '{value}\xB0F', 'style': { 'color': 'red'}}, 'title': { 'text': 'Temperature', 'style': { 'color': 'red'}}, 'opposite': true}, { 'gridLineWidth': 0, 'title': { 'text': 'Humidity', 'style': { 'color': 'blue' }},'labels': {'format': '{value} %','style': { 'color': 'blue'}}}],
+        "series":    [ {
+                        name: 'Indoor Humidity',
+                        type: 'areaspline',
+                        yAxis: 1,
+                        data: [
+                          [
+                            1450274696000,
+                            30.1
+                          ], ... ]
+                        },
+                        {
+                        name: 'Exterior Humidity',
+                        type: 'areaspline',
+                        yAxis: 1,
+                        data: [
+                          [
+                            1450274696000,
+                            34.1
+                          ], .. ]
+                        }
+                    ]
+    }
+
+```
+
+
+__________________________________________________________________________________________________
+
+### Move unit to a different room
+
+Description:    Used to move a unit to a different room/location.
+                Response should return new installation that resulted from this move.
+                New installation should have all sensor configuration removed, to be configured anew.
+                Currently, only moves within the same property are supported.
+
+Method:         POST
+
+Request:        http://cloud.junction.com/api/v1/installations/:installation_id/move
+
+Payload:
+```
+{
+    name: "New Room Name"
+}
+```
+
+Response:
+```
+{
+    "status": true | false
+    "installation": <Installation>
+}
+```
+____________________________________________________________________________________________________
+
+### Request Sensor Configuration API
+
+Description:  Return JSON object with sensor configuration. If a sensor not configured, "detect" key should be "never"
+                and other information can be empty/null
+
+Method: GET
+
+Request:  http://cloud.junction.com/api/v1/installations/:installation_id/sensors
+
+Payload:
+```
+{
+  "sensor_port":"temperature | humidity | motion | lux | sound | co | airq | <external_temp_serial_number> | flood_port_1 | flood_port_2 | flood_port_3",
+}
+```
+
+Response:
+```
+{
+    "status": true | false,
+    "sensors": [
+        {
+          "name":"<user defined name> | factory-name-for-onboard",
+          "type": temperature | humidity | motion | lux | sound | co | airq | flood,
+          "port": internal | <external_temp_serial_number> | external_1 | external_2 | external_3,
+          "detect": always | never | time_window,
+          "minimum":"",
+          "maximum":"",
+          "start_time":"",
+          "end_time":"",
+          "inferred_low":"",
+          "inferred_high":"",
+          "calibration": "",  # only for temperature, external_temp sensors, light, co, airq, and humidity sensors
+        },
+        {
+          "type": "temperature",
+          "port": "internal",
+          "detect": "always",
+          "name":"Onboard Temperature",
+          "minimum":"35",
+          "maximum":"85",
+          "inferred_low":"40",
+          "inferred_high":"75",
+          "calibration":"0"
+        },
+        {
+          "type": "flood",
+          "port": "external_1",
+          "name":"Floor flood sensor",
+          "detect": "always",
+        },
+        {
+          "type": "temperature",
+          "port": "123123123123123",
+          "name": "Boiler output pipe",
+          "detect": "always",
+          "minimum": "90",
+          "maximum": "110",
+          "inferred_low":"95",
+          "inferred_high":"105",
+          "calibration":"0"
+        },
+        {
+          "type": "motion",
+          "port": "internal",
+          "name": "Motion",
+          "detect":  "time_window",
+          "start_time":"7:00",
+          "end_time":"20:15"
+        },
+        {
+          "type": "lux",
+          "port": "internal",
+          "name": "Lights",
+          "detect": "always",
+          "calibration":"0"
+        },
+        {
+          "type": "co",
+          "port": "internal",
+          "name":"CO",
+          "detect": "always",
+          "calibration":"0"
+        },
+        {
+          "type": "airq",
+          "port": "internal",
+          "name":"Air quality",
+          "detect": "always",
+          "calibration":"0"
+        }
+    ]
+}
+```
+____________________________________________________________________________________________________
+
+### Update Sensor Configuration API
+
+Description:  Return JSON object with sensor configuration. Note, only building managers can do this.
+
+Method: POST
+
+Request:  http://cloud.junction.com/api/v1/installations/:installation_id/sensors
+
+Payload:
+```
+{
+    "sensor_port":"temperature | humidity | motion | lux | sound | co | airq | <external_temp_serial_number> | flood_port_1 | flood_port_2 | flood_port_3",
+    "enabled":"",
+    "always_on": true | false | null,
+    "name":"<user defined name> | factory-name-for-onboard",
+    "type": temperature | humidity | motion | lux | sound | co | airq | flood,
+    "port": internal | <external_temp_serial_number> | external_1 | external_2 | external_3,
+    "detect": always | never | time_window,
+    "minimum":"",
+    "maximum":"",
+    "start_time":"",
+    "end_time":"",
+    "inferred_low":"",
+    "inferred_high":"",
+    "calibration":"" #only for light, co, airq, humidity, and external_temp_sensors
+}
+```
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+____________________________________________________________________________________________________
+### Decommission a JunctionBox unit
+
+Description:  Decommission a unit that is being retired, sets mode to decommissioned. Note, only building managers can do this.
+
+Method: POST
+
+Request:  http://cloud.junction.com/api/v1/installations/:installation_id/decommission
+
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+____________________________________________________________________________________________________
+### Enable a decommissioned JunctionBox unit
+
+KM: Can we use the same API as to move an installation, only in this case moving a decommissioned installation?
+
+Description:  Enable a unit that has already been decommissioned, Sets mode to "sold-waiting". For now only can move to existing Property. Note only a building manager could do this.
+
+Method: POST
+
+Request:  http://cloud.junction.com/api/v1/installations/:installation_id/commission
+
+Payload:
+```
+{
+  "property_id": "234234",
+  "name":"New unit's name",
+  }
+```
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+____________________________________________________________________________________________________
+
+### Request Accounting and Billing Information
+
+Description:  Return JSON object with accounting and billing configuration.  Note, only billing person sees this.
+
+Method: GET
+
+Request:  http://cloud.junction.com/api/v1/accounting/<property-id>
+
+Response:
+```
+{
+  "billing_name":"John Doe",
+  "billing_phone":"(212) 555-1212",
+  "billing_email":"john@doe.com",
+  "billing_company":"Company Name",
+  "billing_address":"Address line 1",
+  "billing_city":"New York",
+  "billing_state":"NY",
+  "billing_zip":"10023",
+  "payment_method":"Check | Credit Card",
+  "payment_creditcard":"xxxx-xxxx-xxxx-2321",  # get from braintree
+  "payment_creditcard_expiration":"MM/YY",  # get from braintree
+  "invoice_history":[
+    {
+      "date":"2015-12-10",
+      "unit":"unit-name",
+      "subscription_type":"Monthly | Annual",
+      "payment_method":"Check | Credit Card",
+      "amount":"$123.43"
+    },
+    ...
+  ]
+}
+```
+____________________________________________________________________________________________________
+
+### Update Accounting and Billing Information
+
+Description:  Update JSON object with accounting and billing configuration. Note, only building managers can add people.
+
+Method: POST
+
+Request:  http://cloud.junction.com/api/v1/accounting/<property-id>
+
+Payload:
+```
+{
+  "billing_name":"John Doe",
+  "billing_phone":"(212) 555-1212",
+  "billing_email":"john@doe.com",
+  "billing_company":"Company Name",
+  "billing_address":"Address line 1",
+  "billing_city":"New York",
+  "billing_state":"NY",
+  "billing_zip":"10023"
+}
+
+or
+
+{
+  "payment_method":"Check | Credit Card",
+  "payment_creditcard":"xxxx-xxxx-xxxx-2321",  #update in braintree
+  "payment_creditcard_expiration":"MM/YY"      #update in braintree
+}
+```
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+____________________________________________________________________________________________________
+
+### Request Diagnostic Information
+
+Description:  Return JSON object with accounting and billing configuration
+
+Method: GET
+
+Request:  http://cloud.junction.com/api/v1/diagnostics/<property-id>
+
+Response:
+```
+{
+  "diagnostics":[
+    {
+      "date":"2015-12-10 15:23",
+      "unit":"unit-name",
+      "message_type":"Alert Condition | Sensor Reading ",
+      "ipaddress":"192.168.1.1",
+      "connection_type":"broadband | cellular"
+    },
+    ...
+  ]
+}
+```
+
+____________________________________________________________________________________________________
+
+### Request Room Types
+
+Description:  Return JSON object with room types for setup wizard, all data pulled from the room_defaults table
+
+Method: GET
+
+Request:  http://cloud.junction.com/api/v1/roomtypes
+
+Response:
+```
+{
+  "room_types":[
+    {
+      "roomname":"Boiler Room",
+      "low_temperature": 1,
+      "high_temperature":100,
+      "temperature_alerts_enabled": true,
+      "low_humidity": 1,
+      "high_humidity": 80,
+      "humidity_alerts_enabled": true,
+      "motion_detector_start": "15:30",
+      "motion_detector_stop": "9:00",
+      "motion_detector_always": false,
+      "motion_alerts_enabled ": true,
+      "lights_on_start": "17:00",
+      "lights_on_stop ": "9:00",
+      "lights_always_on": false,
+      "light_alerts_enabled": false,
+      "flood_alerts_enabled": true,
+      "co_alerts_enabled": true,
+      "airq_alerts_enabled": true,
+      "external_temperature_alerts_enabled": true,
+      "audio_alerts_enabled": true
+    },
+    ...
+  ]
+}
+```
+
+
+
+
+
+____________________________________________________________________________________________________
+### Return current user information and password
+
+Description:  Return current logged in user's information
+
+Method: GET
+
+Request:  http://cloud.junction.com/api/v1/profile
+
+Response: HTTP 200
+```
+{
+    "status": true | false,
+    "profile": {
+        "id": "auth0|...",
+        "name": "John Doe",
+        "image": "http://avatar",
+        "first_name":"John",
+        "last_name":"Doe",
+        "company":"Acme Co",
+        "phone":"917-555-1212",
+        "email":"john@doe.com",
+        "email_verified": true | false,
+        "tos_accepted": true | false
+    }
+}
+```
+____________________________________________________________________________________________________
+### Update current user information and password
+
+Description:  Update current logged in user's information
+
+Method: POST
+
+Request:  http://cloud.junction.com/api/v1/profile
+
+Payload:
+```
+{
+    "first_name":"John",
+    "last_name":"Doe",
+    "company":"Acme Co",
+    "phone":"917-555-1212",
+    "email":"john@doe.com",
+    "password":"cleartext-password"
+}
+```
+
+Response: HTTP 200
+```
+{
+    "status": true | false
+}
+```
+____________________________________________________________________________________________________
+### Terms of Service acceptance by user
+
+Description:  Record acceptance of terms of service
+
+Method: POST
+
+Request:  http://cloud.junction.com/api/v1/profile/tos
+
+Payload:
+```
+{"accepted":true}
+```
+
+Response: HTTP 200
+```
+{
+    "status": true | false,
+    "response": "feedback message"
+}
+```
+
+____________________________________________________________________________________________________
+### Email validation for user
+
+Description:  Record that email for user is valid
+
+Method: POST
+
+Request:  http://cloud.junction.com/api/v1/profile/email
+
+Response: HTTP 200
+```
+{
+    "status": true | false,
+    "response": "feedback message"
+}
+```
+
+____________________________________________________________________________________________________
+### Send email login link to a user
+
+Description:  Generate a secure token to be emailed to allow user to login
+
+Method: POST
+
+Request:  http://cloud.junction.com/api/v1/login/email
+
+Payload:
+```
+{
+    "email":"john@test.com"
+}
+```
+
+Response: HTTP 200
+```
+{
+    "status": true | false,
+    "response": "feedback message"
+}
+```
+
+____________________________________________________________________________________________________
+### Send email login link to a user
+
+Description:  Generate a secure token to be sms to allow user to login
+
+Method: POST
+
+Request:  http://cloud.junction.com/api/v1/login/sms
+
+Payload:
+```
+{
+    "phone":"+19175551212"
+}
+```
+
+Response: HTTP 200
+```
+{
+    "status": true | false,
+    "response": "feedback message"
+}
+```
+
+____________________________________________________________________________________________________
+## User authentication with an email link
+
+This flow is used when we want to send an email to a user, with a link that automatically signs the user in when clicked.
+Example is an alert email, or a welcome email.
+
+This is different from passwordless authentication mechanism by auth0, where the user himself requests to sign in
+with a link sent in email or SMS.
+
+1. Junction Cloud generated a valid self signed JWT token
+    * iss should cloud.junction.com
+    * sub should be user id (the same as for Auth0 issued tokens)
+    * exp should be some time in the future
+    * what else?
+2. Junction Cloud sends email with a link to Dashboard that contains the token.
+    Example: https://dashboard.junction.com/#/path/to/someting?token=...
+3. User clicks on the link in the email
+4. Dashboard loads and parses the hash in the url, and stores the token.
+    This is the token that will be passed on each API call in Authorization header
+5. Dashboard calls /api/v1/profile, to retrieve profile of the user for the token
